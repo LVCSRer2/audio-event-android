@@ -117,14 +117,18 @@ fun SettingsScreen(
             description = "Minimum classification confidence to record an event. Higher values reduce false positives."
         ) {
             Text(
-                text = String.format("%.1f", minConfidence),
+                text = String.format("%.2f", minConfidence),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
             Slider(
                 value = minConfidence,
-                onValueChange = { viewModel.updateMinConfidence(it) },
-                valueRange = 0.1f..0.9f,
+                onValueChange = {
+                    val rounded = (it * 100).roundToInt() / 100f
+                    viewModel.updateMinConfidence(rounded)
+                },
+                valueRange = 0.01f..0.99f,
+                steps = 97,
                 modifier = Modifier.fillMaxWidth()
             )
         }

@@ -3,6 +3,7 @@ package com.audiolifelog.app.audio
 import android.util.Log
 import com.audiolifelog.app.data.db.entity.AudioEventEntity
 import com.audiolifelog.app.data.repository.AudioEventRepository
+import com.audiolifelog.app.util.PreferencesManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,7 +31,8 @@ class AudioClassificationPipeline @Inject constructor(
     private val captureManager: AudioCaptureManager,
     private val spectrogramComputer: MelSpectrogramComputer,
     private val classifier: OnnxClassifier,
-    private val repository: AudioEventRepository
+    private val repository: AudioEventRepository,
+    private val preferencesManager: PreferencesManager
 ) {
 
     companion object {
@@ -108,10 +111,12 @@ class AudioClassificationPipeline @Inject constructor(
     // -------------------------------------------------------------------------
 
     private suspend fun processOneWindow() {
-        val samples = captureManager.readWindowIfActive(RMS_THRESHOLD) ?: return
+        val rmsThreshold = preferencesManager.rmsThreshold.first()
+        val samples = captureManager.readWindowIfActive(rmsThreshold) ?: return
 
         val melSpectrogram = spectrogramComputer.compute(samples)
-        val results = classifier.classify(melSpectrogram)
+        val minConfidence = preferencesManager.minConfidence.first()
+        val results = classifier.classify(melSpectrogram, minConfidence)
 
         if (results.isEmpty()) return
 
