@@ -24,7 +24,7 @@ class OnnxClassifier @Inject constructor(
 
     companion object {
         private const val TAG = "OnnxClassifier"
-        private const val MODEL_ASSET_PATH = "mn04_as_int8.onnx"
+        private const val MODEL_ASSET_PATH = "mn05_as.onnx"
         private const val MIN_CONFIDENCE_DEFAULT = 0.15f
     }
 
@@ -76,9 +76,27 @@ class OnnxClassifier @Inject constructor(
         val inputName = session.inputNames.first()
         val results = session.run(mapOf(inputName to inputTensor))
 
-        val outputTensor = results[0]
-        val rawValue = outputTensor.value
-        Log.d(TAG, "Output type: ${rawValue?.javaClass?.name}, outputs count: ${results.size()}")
+        // Model may have multiple outputs. Find the one with 527 classes (logits).
+        var logitsOutput: Any? = null
+        for (i in 0 until results.size()) {
+            val value = results[i].value
+            val size = when (value) {
+                is FloatArray -> value.size
+                is Array<*> -> (value as? Array<FloatArray>)?.getOrNull(0)?.size ?: 0
+                else -> 0
+            }
+            Log.d(TAG, "Output[$i] type: ${value?.javaClass?.name}, size: $size")
+            if (size == 527) {
+                logitsOutput = value
+                break
+            }
+        }
+        if (logitsOutput == null) {
+            // Fallback: use first output
+            logitsOutput = results[0].value
+        }
+        val rawValue = logitsOutput
+        Log.d(TAG, "Using output with type: ${rawValue?.javaClass?.name}, outputs count: ${results.size()}")
 
         val logits: FloatArray = when (rawValue) {
             is Array<*> -> {
