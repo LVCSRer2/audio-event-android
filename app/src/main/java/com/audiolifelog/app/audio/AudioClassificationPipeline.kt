@@ -39,7 +39,7 @@ class AudioClassificationPipeline @Inject constructor(
         private const val RMS_THRESHOLD = 0.01f
 
         /** How often to flush accumulated events to the database (ms). */
-        private const val FLUSH_INTERVAL_MS = 30_000L
+        private const val FLUSH_INTERVAL_MS = 2_000L
 
         /** Small delay between capture reads to avoid busy-looping (ms). */
         private const val READ_INTERVAL_MS = 50L
@@ -115,21 +115,22 @@ class AudioClassificationPipeline @Inject constructor(
 
         if (results.isEmpty()) return
 
+        // 1-best: confidence가 가장 높은 결과만 사용
+        val best = results.first()
+
         val now = System.currentTimeMillis()
         val durationMs = (AudioCaptureManager.WINDOW_SAMPLES * 1000L) / AudioCaptureManager.SAMPLE_RATE
 
-        for (result in results) {
-            _classificationFlow.tryEmit(result)
+        _classificationFlow.tryEmit(best)
 
-            val entity = AudioEventEntity(
-                timestamp = now,
-                eventLabel = result.label,
-                confidence = result.confidence,
-                durationMs = durationMs
-            )
-            synchronized(batchLock) {
-                eventBatch.add(entity)
-            }
+        val entity = AudioEventEntity(
+            timestamp = now,
+            eventLabel = best.label,
+            confidence = best.confidence,
+            durationMs = durationMs
+        )
+        synchronized(batchLock) {
+            eventBatch.add(entity)
         }
     }
 
